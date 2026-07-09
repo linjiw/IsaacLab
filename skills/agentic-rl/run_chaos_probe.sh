@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
-# Chaos-floor probe (EVAL_FRAMEWORK §2.1): measure the Isaac Lab/skrl run-to-run
-# noise band on the held-out metric, so the equivalence gate's tau is calibrated
-# for THIS engine (not borrowed from SONIC/A10G). Without this, no manager-vs-
-# scripted claim is defensible.
+# Noise-band probe (EVAL_FRAMEWORK §2.1): measure the Isaac Lab/skrl held-out
+# noise band, so the equivalence gate's tau is calibrated for THIS engine (not
+# borrowed from SONIC/A10G). Without this, no manager-vs-scripted claim is
+# defensible.
 #
-# Runs the SAME control config N times varying ONLY the seed (control arm =
-# fixed defaults, no manager, no scripted). The std of the final
-# heldout_success_rate across runs is sigma_noise. calibrate_tau turns that into
-# the equivalence tolerance.
+# IMPORTANT (corrected after the v2 pilot): skrl training here is BIT-
+# DETERMINISTIC — same seed + config reproduces held-out to ~9 sig figs (manager
+# and scripted arms were bit-identical). So the fp-"chaos" floor SONIC measured
+# (same-seed re-runs diverging on nondeterministic kernels) is ~0 here, and the
+# relevant noise for a CROSS-SEED ON-vs-OFF verdict is the SEED-to-seed variance
+# of held-out. This probe therefore varies the SEED (control arm, fixed
+# defaults) across N runs; sigma over the per-seed held-out is sigma_noise, and
+# calibrate_tau turns it into the equivalence tolerance. (Named "chaos" for
+# continuity with the SONIC E5B methodology; here it measures seed variance.)
 #
 # ARCHITECTURE: host-driven (like run_pilot.sh). Usage:
 #   run_chaos_probe.sh <warm_ckpt> <heldout_manifest> [n_seeds] [segments] [iters] [num_envs]
