@@ -41,7 +41,11 @@ def readiness(tasks: Dict[str, Any], knob_names: List[str]) -> Dict[str, Any]:
         subset = spec.get("knob_subset") or []
         unknown = [k for k in subset if k not in known]
         has_gate = bool(spec.get("gate_metric"))
-        ready = has_gate and bool(subset) and not unknown
+        # an explicit status: not_ready overrides the structural check (e.g. the
+        # gate_metric kind isn't yet implemented in eval_rollout, even though the
+        # declaration is well-formed and its knobs are all in the registry).
+        declared_not_ready = spec.get("status") == "not_ready"
+        ready = has_gate and bool(subset) and not unknown and not declared_not_ready
         out[task] = {
             "ready": ready,
             "family": spec.get("family"),
@@ -49,6 +53,7 @@ def readiness(tasks: Dict[str, Any], knob_names: List[str]) -> Dict[str, Any]:
             "gate_metric": (spec.get("gate_metric") or {}).get("kind"),
             "n_knobs": len(subset),
             "unknown_knobs": unknown,
+            "status": spec.get("status", "ready" if ready else "incomplete"),
         }
     return out
 

@@ -6,11 +6,15 @@
 # Seeded for the Phase-1 target family (locomotion velocity); grow over time.
 #
 # gate_metric.kind:
-#   tracking_within_tol - fraction of steps tracking the command within tol
-#                         (eval_rollout computes this for velocity tasks)
-#   success_rate        - env already logs a success signal
-#   progress_rate       - partial-completion signal
-# A task is "curriculum-ready" when it has a gate_metric AND a knob_subset.
+#   tracking_within_tol       - fraction of steps tracking the command within tol
+#                               (eval_rollout computes this for velocity tasks)
+#   lifted_and_goal_within_tol- manipulation: object lifted (>= minimal_height)
+#                               AND within tol of the goal pose (needs an
+#                               eval_rollout manipulation branch — Phase-3)
+#   success_rate              - env already logs a success signal
+#   progress_rate             - partial-completion signal
+# A task is "curriculum-ready" when it has a gate_metric AND a knob_subset whose
+# knobs all exist in the registry (catalog.py checks this).
 
 tasks:
   Isaac-Velocity-Rough-Anymal-C-v0:
@@ -48,6 +52,32 @@ tasks:
       - learning_rate
       - entropy_coef
       - desired_kl
+
+  # Manipulation (2nd task family, Phase-3 SCALE). The Lift env exposes clean
+  # success signals — object_is_lifted (minimal_height=0.04) + object_goal_
+  # distance (command_name=object_pose) — so the gate is "lifted AND within tol
+  # of the goal pose", and the held-out grid is a frozen set of GOAL POSES
+  # (analogous to the frozen velocity grid). knob_subset is optimizer-only for
+  # now (task-agnostic, in the registry); manipulation reward-weight knobs
+  # (reaching/lifting/goal-tracking weights) + the object_pose command-range
+  # knob are a follow-up requiring a manipulation eval_rollout branch + registry
+  # entries. NOT yet curriculum-ready (gate kind unimplemented in eval_rollout).
+  Isaac-Lift-Cube-Franka-v0:
+    family: manipulation
+    workflow: manager_based
+    frameworks: [rsl_rl, rl_games, skrl]
+    play_task: Isaac-Lift-Cube-Franka-Play-v0
+    gate_metric:
+      kind: lifted_and_goal_within_tol
+      name: gate
+      minimal_height: 0.04
+      tolerance: 0.05
+    native_curriculum: [action_rate, joint_vel]   # modify_reward_weight terms in the env cfg
+    knob_subset:
+      - learning_rate
+      - entropy_coef
+      - desired_kl
+    status: not_ready    # needs a manipulation eval_rollout branch (Phase-3)
 
   # Cartpole: the Phase-0 smoke target (fast, cheap). Non-locomotion → gate
   # falls back to mean reward in eval_rollout. No curriculum knobs declared.

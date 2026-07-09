@@ -69,3 +69,13 @@ def test_readiness_flags_unknown_knob():
         ["learning_rate"])
     assert rep["T"]["ready"] is False
     assert rep["T"]["unknown_knobs"] == ["bogus_knob"]
+
+
+def test_status_not_ready_overrides_structural_check():
+    # a well-formed task with all-known knobs but status:not_ready is NOT ready
+    rep = catalog.readiness(
+        {"T": {"gate_metric": {"kind": "success_rate"},
+               "knob_subset": ["learning_rate"], "status": "not_ready"}},
+        ["learning_rate"])
+    assert rep["T"]["ready"] is False
+    assert rep["T"]["status"] == "not_ready"
