@@ -59,7 +59,7 @@ Velocity/locomotion, manipulation (Lift, Reach, Stack, Open, PickPlace), dextero
 Shadow-Hand), factory/contact-rich (Factory, Forge, AutoMate), navigation, classic (Cartpole,
 Ant, Humanoid, Quadcopter). ~179 unique `Isaac-*` IDs.
 
-## Files (to implement in this skill)
+## Files (bundled)
 - `tasks.yaml` — the per-task declarations (seeded for the Phase-1 target family, grown over time).
 - `catalog.py` — wrap `scripts/environments/list_envs.py`; join live registry against tasks.yaml;
   report which tasks are "curriculum-ready" (have a gate metric + knob subset).

@@ -83,11 +83,16 @@ seg1 (knobs A) ──ckpt──▶ snapshot_seg1.pt ──▶ seg2 (knobs B, res
 Lab `-Play-v0` variants already reduce num_envs and disable noise/DR, which gets us most of
 the way; the adapter still asserts no knob override leaks into the eval invocation.
 
-## Files (to implement in this skill)
-- `isaaclab_adapter.py` — `IsaacLabAdapter` (the 6 methods) + `KNOB_TO_HYDRA` (raises on
-  unmapped knobs — never invents config paths) + command builders + TB parser + CLI/dry-run.
-- `test_isaaclab_adapter.py` — CPU tests for command building + parsing against real log/TB
-  excerpts in `testdata/`.
+## Files (bundled)
+- `isaaclab_adapter.py` — `IsaacLabAdapter` (the 6 methods) + the knob→Hydra tables (raise on
+  unmapped knobs — never invents config paths) + command builders + a safe YAML loader for the
+  resolved config (Isaac Lab's `!!python/*` tags) + CLI/dry-run.
+- `eval_rollout.py` — the headless metrics-writing eval (runs in-container); forces the held-out
+  command grid + emits per-condition breakdown.
+- `gate_metrics.py` — pure, CPU-testable gate arithmetic (locomotion `tracking_within_tol`,
+  manipulation `lifted_and_goal_within_tol`); imported by `eval_rollout`.
+- `test_isaaclab_adapter.py`, `test_gate_metrics.py` — CPU tests (command building, TB-scalar
+  normalization, the YAML-tag loader, and the gate arithmetic).
 
 ## Quick start
 ```bash

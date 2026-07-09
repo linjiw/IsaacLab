@@ -68,7 +68,7 @@ knobs:
 values against the run's saved `params/{env,agent}.yaml`, raising `ConfigDriftError` on any
 divergence — so a wrong belief can never turn a "one-notch" change into a 2× jump.
 
-## Files (to implement in this skill)
+## Files (bundled)
 - `registry.yaml` — the Isaac Lab action space (authored per task family / framework).
 - `validate.py` — thin CLI over the vendored validator.
 

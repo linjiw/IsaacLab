@@ -52,7 +52,7 @@ manager cannot tighten/loosen the very bar it is judged against.
 - The record emitter **refuses** to emit a metric if the eval touched motions/tasks outside
   the manifest — a mis-wired eval can't silently feed a wrong number.
 
-## Files (to implement in this skill)
+## Files (bundled)
 - `holdout.py` — split / manifest / integrity / record emission + CLI (adapt SONIC `holdout.py`).
 - `test_holdout.py` — CPU tests (split determinism, growth stability, integrity, refusal).
 
