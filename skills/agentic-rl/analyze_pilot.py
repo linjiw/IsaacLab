@@ -35,6 +35,25 @@ def _final_heldout(journal):
     return s[-1] if s else None
 
 
+def _auc(journal):
+    """Mean held-out over all segments = a sample-EFFICIENCY proxy (area under
+    the held-out-vs-segment curve / n). A curriculum's real claim is 'reach
+    competence FASTER', so a higher AUC at equal budget means the arm spent
+    more of the run competent — a stronger signal than final alone when the
+    metric is convergence-dominated and all arms share the iteration budget."""
+    s = [h for h in _heldout_series(journal) if h is not None]
+    return sum(s) / len(s) if s else None
+
+
+def _iters_to_threshold(journal, thr=0.35, iters_per_seg=150):
+    """Approx iterations for held-out to first reach `thr` (sample efficiency:
+    lower = the arm got competent sooner)."""
+    for i, h in enumerate(_heldout_series(journal), start=1):
+        if h is not None and h >= thr:
+            return i * iters_per_seg
+    return None
+
+
 def _applied(journal):
     return [(e["tick"], e["decision"]["knob"], e["decision"]["value"])
             for e in journal if e.get("applied")]
@@ -106,18 +125,37 @@ def main(argv=None) -> int:
         else:
             print(f"{arm:10} (no per-condition data)")
 
+    # sample-efficiency view (the RIGHT framing for RL curricula: reach
+    # competence FASTER, not just higher-final at equal budget)
+    print("\n--- sample efficiency (held-out AUC = mean over segments; "
+          "iters-to-0.35) ---")
+    for arm, j in arms.items():
+        auc = _auc(j)
+        itt = _iters_to_threshold(j)
+        auc_s = f"{auc:.4f}" if auc is not None else "n/a"
+        itt_s = f"{itt}" if itt is not None else ">budget"
+        print(f"  {arm:10} AUC={auc_s}  iters_to_0.35={itt_s}")
+
     # honest verdict scaffold
-    print("\n--- comparison (held-out final) ---")
+    print("\n--- comparison (held-out final AND AUC) ---")
     fins = {a: _final_heldout(j) for a, j in arms.items()}
-    base = fins.get("control")
-    for arm in ("manager", "scripted"):
+    aucs = {a: _auc(j) for a, j in arms.items()}
+    base, base_auc = fins.get("control"), aucs.get("control")
+    for arm in ("manager", "scripted", "llm"):
         if fins.get(arm) is not None and base is not None:
-            d = fins[arm] - base
-            print(f"  {arm} - control = {d:+.4f} held-out")
+            df = fins[arm] - base
+            da = (aucs[arm] - base_auc) if (aucs.get(arm) is not None
+                                            and base_auc is not None) else None
+            da_s = f"{da:+.4f}" if da is not None else "n/a"
+            print(f"  {arm} - control:  final {df:+.4f}   AUC {da_s}")
     if fins.get("manager") is not None and fins.get("scripted") is not None:
-        d = fins["manager"] - fins["scripted"]
-        print(f"  manager - scripted = {d:+.4f} held-out  "
-              f"(the null-result question)")
+        df = fins["manager"] - fins["scripted"]
+        da = ((aucs["manager"] - aucs["scripted"])
+              if aucs.get("manager") is not None and aucs.get("scripted") is not None
+              else None)
+        da_s = f"{da:+.4f}" if da is not None else "n/a"
+        print(f"  manager - scripted: final {df:+.4f}   AUC {da_s}  "
+              f"(the adaptivity question — AUC is the fairer read)")
 
     # ── equivalence-gate verdict (EVAL_FRAMEWORK §2) ──
     # apply the chaos-floor gate to the held-out TRAJECTORIES. tau MUST be

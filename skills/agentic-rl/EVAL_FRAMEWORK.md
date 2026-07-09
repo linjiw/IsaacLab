@@ -27,18 +27,24 @@ move helps**" — the actual adaptivity claim.
 **`heldout_success_rate`** — fraction of steps tracking a FROZEN, salted-hash-split grid of
 in-envelope velocity commands within a fixed tolerance (0.25). Protected: the manager cannot
 see the grid composition, reweight it, re-threshold it, or add it to training (holdout.py +
-process boundary). Reported as the **final-segment** value and the **mean of the last 2
-segments** (less noisy).
+process boundary). Reported BOTH as:
+- **AUC** = mean held-out over all segments (the PRIMARY read), and
+- **final-segment** value + **iters-to-threshold** (0.35).
 
-Rationale for "final/last-2" not "area under curve": all arms share the warm-start, so early
-segments are near-identical; the signal is where they diverge (the end).
+**Why AUC, not just final (corrected 2026-07-09):** an earlier version of this doc argued
+"final/last-2, not AUC" on the grounds that arms diverge only at the end. The v2 pilot refuted
+that: the metric is **convergence-dominated** and all arms share an equal iteration budget, so
+FINAL held-out is dominated by the shared budget and is nearly identical across arms *by
+construction*. A curriculum's real claim is **"reach competence FASTER"** — that is a property of
+the whole trajectory SHAPE, captured by AUC and iters-to-threshold, not by the endpoint. So
+sample efficiency is PRIMARY, final is secondary. (This is the standard framing for RL-curriculum
+evaluation; see GAPS.md A0.)
 
 ### 1.2 Secondary metrics (diagnostic, never the headline)
 - **Per-condition held-out** (`heldout_per_condition`): per-command success. Guards the
   SONIC failure mode where **one dominating condition** drove 51–96% of apparent gains. We
   report the *worst-condition* success and the spread, not just the mean.
-- **Sample efficiency**: held-out at a fixed iteration budget (all arms run equal iters, so
-  final held-out already controls for this).
+- **Final-segment held-out**: the endpoint; secondary to AUC per the correction above.
 - **Standard `success_rate`** (unprotected eval): reported only to show it tracks the held-out
   metric; NEVER used to compare arms (Goodhart — it's the manager's own decision input surrogate).
 - **`mean_tracking_error`**: read jointly with success (a policy can lower error on the easy
