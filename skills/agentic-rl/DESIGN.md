@@ -317,6 +317,39 @@ Reproduce the groot ON-vs-OFF methodology so a positive result would be trustwor
 
 ---
 
+## 9. Phase-1 lessons (learned by running it for real, 2026-07-09)
+
+Findings that only surfaced end-to-end; each is now fixed/guarded and captured here so the design
+record — not just commit messages — carries them.
+
+**Integration (all fixed + regression-tested):**
+- **Host vs container.** The adapter execs into `isaac-lab-base`, so the driver must run ON THE
+  HOST (has `docker` + pure Python); running it inside the container fails. `/workspace` is
+  bind-mounted whole, so container logs == host logs. `run_curriculum.py` preflights `docker`.
+- **YAML tags.** Isaac Lab's `dump_yaml` emits `!!python/tuple`/`!!python/object` tags that
+  `yaml.safe_load` (used by the loop's config-drift verifier) refuses. The adapter now loads with
+  a safe custom loader and re-emits clean YAML. Verified: all knob paths resolve to real values.
+- **Root-owned logs.** The container's log dir is root-owned; the host driver's journals go to a
+  host-writable `_runs/` under the (bind-mounted) skill dir.
+
+**Experiment validity (the important ones):**
+- **Do-nothing-manager-on-a-healthy-run.** A conservative manager on an in-band, improving run
+  correctly proposes nothing → an empty scripted ladder → a vacuous comparison. Calibrate the
+  band (`--t-low/--t-high`) and `--sustain` to the run's actual operating point so the manager
+  makes real gated decisions (the first pilot was vacuous; the reconfigured one made 3 hardenings).
+- **Operating-point calibration.** Rough-terrain Anymal-C tracking-within-0.25-tol plateaus
+  ~0.32–0.40 at this budget; the manager band must straddle that, and the held-out grid must be
+  IN-ENVELOPE (an unachievable grid floors the metric at 0 for every policy — protection comes
+  from the manager not SEEING the grid, not from making it impossibly hard).
+- **Convergence domination + equal budget ⇒ null by construction.** The held-out metric is
+  dominated by iteration count; with all arms sharing an equal budget, FINAL held-out is
+  ~identical regardless of adaptivity. Two consequences: (1) evaluate on **sample efficiency**
+  (AUC / iters-to-threshold), not final; (2) the command-range lever moved the metric ~0 here —
+  **lever sensitivity (gate G7) must be proven before a real verdict**, or re-pair lever/metric
+  (optimizer or reward-weight knobs; tighter tolerance). See EVAL_FRAMEWORK §3a + GAPS A0.
+
+---
+
 ## Appendix: key source references
 **IsaacLab**
 - Training: `scripts/reinforcement_learning/{rl_games,skrl}/train.py`, `.../play.py`
