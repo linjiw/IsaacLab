@@ -54,6 +54,7 @@ class _Args:
         self.t_low = 0.50
         self.t_high = 0.85
         self.sustain = 3
+        self.base_knob = []
         for k, v in kw.items():
             setattr(self, k, v)
 

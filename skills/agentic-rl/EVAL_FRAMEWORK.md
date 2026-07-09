@@ -98,6 +98,31 @@ multi-seed experiment (§2.1).
 
 ---
 
+## 3a. The lever–metric coupling prerequisite (learned from the v2 pilot)
+
+**A null result is only meaningful if the knob CAN move the metric.** The v2 manager arm made 3
+real hardening moves (command range 1.0→1.25→1.5→1.75) yet held-out barely moved
+(0.34→0.39→0.37, range 0.047 — indistinguishable from drift). Reason: the held-out grid is FIXED
+in-envelope (|vx|≤1); widening the *training* command range changes the training distribution but
+is evaluated on the same in-envelope commands, so its effect on in-envelope held-out is
+theoretically ambiguous and empirically ~zero here.
+
+**Consequence:** an ON-vs-OFF null on THIS lever+metric pair would be uninformative — it can't
+distinguish "adaptivity doesn't help" from "this knob doesn't move this metric for anyone." Before
+running the multi-seed experiment we MUST establish **lever sensitivity**: does the knob move the
+metric by more than τ for SOMEONE (e.g. control-at-widest vs control-at-narrowest)? If not, either
+(a) pick a lever the metric responds to (optimizer knobs if the run is under-converged; reward
+weights that trade off tracking directly; or a HARDER-tolerance held-out so the policy has room to
+improve), or (b) pick a metric the lever moves (evaluate held-out at command magnitudes the range
+knob actually gates — but keep it protected). This is a **precondition**, added to the validity
+gates below:
+
+- **(G7) Lever sensitivity:** the manager's knob, swept across its range on the control policy,
+  changes the primary metric by > τ. Else the experiment cannot detect adaptivity on this pair —
+  report that and re-pair before claiming a null.
+
+---
+
 ## 4. Validity gates (must all pass, else the run is void — enforced by `verify_gate.py`)
 
 1. All arms share the identical warm-start checkpoint and segment schedule.

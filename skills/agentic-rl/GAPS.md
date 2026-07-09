@@ -9,6 +9,28 @@ beyond one task/framework · **[POLISH]** quality/robustness.
 
 ---
 
+## A0. THE central design question (surfaced by the v2 real data)
+
+- **[BLOCK] The held-out metric is convergence-dominated, which may make the ON-vs-OFF
+  comparison structurally null regardless of the lever.** Evidence from real runs:
+  training duration moves held-out enormously (60 iter → 0.016, 400 iter → 0.32), while
+  widening the command range moved it ~0 (manager arm: 0.34→0.39→0.37, flat). Two consequences:
+  1. The **command-range lever is wrong for this metric** (it changes the training distribution,
+     evaluated on a fixed in-envelope grid → ~no effect). Use a lever the metric responds to:
+     the **optimizer family** (lr/entropy/KL) if segments are under-converged (they are —
+     held-out is still rising), or **reward-weight** knobs that directly trade off tracking.
+  2. **Deeper:** if the metric is dominated by iteration count, and every arm trains the SAME
+     total iterations by design, all arms converge to nearly the same held-out → a null is almost
+     guaranteed *by construction*, not by "adaptivity doesn't help." **The comparison only has
+     power if the lever can change the metric MORE than the shared iteration budget does.**
+  **Resolution path (must settle before the multi-seed [BLOCK] run):** (a) run the
+  lever-sensitivity probe (`run_sensitivity_probe.sh`) for the CANDIDATE lever; (b) if
+  command-range fails G7, switch the manager+scripted to an optimizer or reward-weight lever and
+  re-probe; (c) consider a tighter held-out tolerance (0.15 not 0.25) for more dynamic range; (d)
+  if NO lever beats the iteration-budget effect, the honest finding is "at this task/budget,
+  curriculum knobs don't move the protected metric beyond training-duration" — a valid negative
+  result, reported as such. This is the top question for the third review.
+
 ## A. Evaluation & scientific validity
 
 - **[BLOCK] No measured Isaac Lab noise band.** The equivalence gate uses SONIC's τ

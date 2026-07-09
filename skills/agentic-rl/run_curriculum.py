@@ -89,6 +89,16 @@ def make_config(arm: str, args, adapter) -> LoopConfig:
         # Isaac Lab train scalar keys the digest should summarize
         train_scalar_keys=("Episode/rew_mean", "Episode/len_mean"),
     )
+    # base_knobs: seed a knob at a FIXED value for the whole run. With the
+    # control arm (proposals off) this pins the knob — used by the lever-
+    # sensitivity probe (EVAL_FRAMEWORK §3a/G7): run control at knob=lo vs
+    # knob=hi and measure the held-out delta to prove the lever moves the metric.
+    if args.base_knob:
+        bk = {}
+        for kv in args.base_knob:
+            name, val = kv.split("=", 1)
+            bk[name] = float(val)
+        common["base_knobs"] = bk
     # review R4: arm the disk gate (>=8GB free before each launch) on a real
     # run so a multi-segment campaign has the advertised backstop. The mock
     # adapter has no host dir, so only wire it for non-dry runs.
@@ -223,6 +233,10 @@ def main(argv=None) -> int:
                    help="consecutive evals the held-out condition must hold "
                         "before the manager acts (lower = acts sooner, fewer "
                         "segments needed for a non-vacuous run)")
+    p.add_argument("--base-knob", action="append", default=[],
+                   help="name=value, repeatable: pin a knob at a fixed value "
+                        "for the whole run (with --arm control = fixed lever; "
+                        "used by the lever-sensitivity probe, EVAL_FRAMEWORK G7)")
     args = p.parse_args(argv)
 
     # Phase-1 is skrl-only. rl_games train/eval paths are not yet implemented
