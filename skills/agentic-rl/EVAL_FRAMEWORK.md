@@ -12,12 +12,35 @@ here is **trustworthiness**, not "the manager won."
 ## 0. The one-sentence question
 
 > Does an LLM/rule outer loop that **adaptively** adjusts curriculum knobs (gated on a protected
-> held-out metric) beat (a) fixed defaults [**control**] and (b) an **open-loop replay of its own
-> realized knob ladder** [**scripted**] — by more than run-to-run noise?
+> held-out metric) beat (a) fixed defaults [**control**] and (b) an **open-loop replay of a fixed
+> knob ladder** [**scripted**] — by more than cross-seed noise?
 
 The scripted arm is the load-bearing comparator: beating *control* only shows "moving the knob
 helps"; beating *scripted* is the only thing that shows "**reading the digest to decide WHEN to
 move helps**" — the actual adaptivity claim.
+
+## 0a. The scripted arm MUST be cross-seed (protocol finding, 2026-07-09)
+
+**Critical, learned from real data:** skrl training here is **bit-deterministic** given
+(seed, warm-start, config) — the v2 scripted arm's held-out matched the manager's to 9 sig figs
+at every pre-divergence segment. Therefore:
+
+- **A same-seed scripted arm that replays THAT seed's own manager ladder is DEGENERATE.** The
+  manager decides deterministically from the (deterministic) digest; replaying its own decisions
+  at the same ticks reproduces the identical knob schedule → **bit-identical run → manager −
+  scripted ≡ 0 by construction.** This is a tautology, not a null result. (The v2 pilot has
+  exactly this degeneracy — it still validates the machinery, but its manager-vs-scripted delta
+  is meaningless.)
+- **The ablation only has meaning ACROSS seeds.** The scripted arm must replay a **FIXED ladder
+  transplanted from a DIFFERENT seed** (SONIC's `V4_MANAGER_LADDER` was exactly this — one fixed
+  ladder replayed across seeds). Then at seed B: `manager@B` adapts its timing to B's own digest;
+  `scripted@B` applies A's fixed timing blind to B. Their difference measures whether
+  **run-specific adaptive timing beats a transplanted fixed schedule** — the real adaptivity test.
+
+**Protocol for the real experiment:** run the manager on seed A → extract its ladder →
+run BOTH manager and scripted on seeds B, C, … where scripted replays A's fixed ladder. Compare
+`manager@{B,C}` vs `scripted@{B,C}` on AUC. `--scripted-from-journal` already takes an arbitrary
+journal, so this needs only orchestration (run_pilot must NOT feed a seed its own manager journal).
 
 ---
 
