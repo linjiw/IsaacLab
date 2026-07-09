@@ -1,0 +1,116 @@
+# Isaac Lab curriculum-RL knob registry — locomotion velocity (Anymal-C).
+#
+# The action space for the LLM curriculum manager on Isaac-Velocity-Rough-
+# Anymal-C-v0 (skrl / rl_games). Consumed by runmanager/core/registry.py::
+# KnobRegistry; each knob is validated (hard_range / max_step / cooldown /
+# pending gate) before any GPU spend. Config paths are VERIFIED against
+# velocity_env_cfg.py + config/anymal_c/agents/skrl_rough_ppo_cfg.yaml.
+#
+# `config_path` here is the resolved-config dotted path (prefix stripped:
+# env.yaml/agent.yaml are separate files) that the adapter's
+# knob_to_config_path() returns and verify_against_config() walks. The FULL
+# Hydra override path (with env./agent. prefix) lives in isaaclab_adapter's
+# knob tables.
+#
+# Float scalars only (the validator supports float | choice). Command-range
+# knobs are modeled as a scalar HALF-WIDTH (symmetric range [-w, w]); the
+# adapter expands the scalar to the "[-w, w]" tuple at launch. See
+# knob_registry note in the SKILL.md.
+
+meta:
+  global_rules:
+    max_changes_per_tick: 1
+    default_action: none
+  # families whose 'set' decisions are gated on a non-null held-out metric
+  heldout_gated_families: [schedule]
+
+knobs:
+  # ── Family A — data/task curriculum ──────────────────────────────
+  command_range_lin_vel_x:
+    family: data_curriculum
+    type: float
+    # scalar half-width; adapter expands to lin_vel_x=[-w, w]
+    config_path: commands.base_velocity.ranges.lin_vel_x
+    default: 1.0
+    hard_range: [0.5, 3.0]
+    max_step: {kind: additive, step: 0.25}   # float: additive is enforced (notch is choice-only)
+    cooldown_ticks: 2
+    status: available
+    verified_source: "velocity_env_cfg.py:103 (lin_vel_x=(-1.0, 1.0))"
+
+  command_range_ang_vel_z:
+    family: data_curriculum
+    type: float
+    config_path: commands.base_velocity.ranges.ang_vel_z
+    default: 1.0
+    hard_range: [0.5, 3.0]
+    max_step: {kind: additive, step: 0.25}   # float: additive is enforced (notch is choice-only)
+    cooldown_ticks: 2
+    status: available
+    verified_source: "velocity_env_cfg.py:103 (ang_vel_z=(-1.0, 1.0))"
+
+  # ── Family B — competence-gated reward-weight ramps ──────────────
+  # Held-out gated: only fires when eval.heldout_success_rate is non-null.
+  reward_weight_action_rate:
+    family: schedule
+    type: float
+    config_path: rewards.action_rate_l2.weight
+    default: -0.01
+    hard_range: [-0.5, 0.0]
+    # ADDITIVE step: weights are NEGATIVE, and the validator's multiplicative
+    # bound is skipped when current<=0 (registry.py:292) — additive uses abs()
+    # and is sign-agnostic, so the step is actually enforced (review R3).
+    max_step: {kind: additive, step: 0.02}
+    cooldown_ticks: 3
+    # status:design until the held-out watcher lands — a schedule-family knob
+    # must be held-out-gated, but no held-out metric is produced yet, and the
+    # loop doesn't pass a digest to validate_decision, so the gate is inert.
+    # design status makes validate_decision REFUSE it (registry.py) unless
+    # allow_design=True, so it cannot fire UNGATED (review B3).
+    status: design
+    verified_source: "velocity_env_cfg.py:246 (action_rate_l2 weight=-0.01)"
+
+  reward_weight_dof_acc:
+    family: schedule
+    type: float
+    config_path: rewards.dof_acc_l2.weight
+    default: -2.5e-7
+    hard_range: [-1.0e-5, 0.0]
+    max_step: {kind: additive, step: 2.0e-7}   # additive: enforced for negatives (R3)
+    cooldown_ticks: 3
+    status: design                              # held-out-gated; watcher not yet impl (B3)
+    verified_source: "velocity_env_cfg.py:245 (dof_acc_l2 weight=-2.5e-7)"
+
+  # ── Family C — optimizer meta-parameters ─────────────────────────
+  learning_rate:
+    family: optimizer
+    type: float
+    config_path: agent.learning_rate           # skrl; rl_games: params.config.learning_rate
+    default: 1.0e-3
+    hard_range: [1.0e-4, 3.0e-3]
+    max_step: {kind: multiplicative, factor: 1.5}
+    cooldown_ticks: 4
+    status: available
+    verified_source: "skrl_rough_ppo_cfg.yaml (agent.learning_rate=1.0e-03)"
+
+  entropy_coef:
+    family: optimizer
+    type: float
+    config_path: agent.entropy_loss_scale       # skrl; rl_games: params.config.entropy_coef
+    default: 0.005
+    hard_range: [0.0, 0.02]
+    max_step: {kind: additive, step: 0.002}
+    cooldown_ticks: 4
+    status: available
+    verified_source: "skrl_rough_ppo_cfg.yaml (agent.entropy_loss_scale=0.005)"
+
+  desired_kl:
+    family: optimizer
+    type: float
+    config_path: agent.learning_rate_scheduler_kwargs.kl_threshold  # skrl
+    default: 0.01
+    hard_range: [0.004, 0.02]
+    max_step: {kind: multiplicative, factor: 1.5}
+    cooldown_ticks: 4
+    status: available
+    verified_source: "skrl_rough_ppo_cfg.yaml (learning_rate_scheduler_kwargs.kl_threshold=0.01)"

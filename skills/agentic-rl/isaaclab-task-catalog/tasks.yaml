@@ -1,0 +1,65 @@
+# Isaac Lab curriculum-RL task catalog.
+#
+# Per-task declarations the run-manager loop needs but cannot infer from the
+# gym registry: the gate metric (locomotion logs tracking ERROR, not a
+# success rate → derived), the applicable knob subset, and the RL framework.
+# Seeded for the Phase-1 target family (locomotion velocity); grow over time.
+#
+# gate_metric.kind:
+#   tracking_within_tol - fraction of steps tracking the command within tol
+#                         (eval_rollout computes this for velocity tasks)
+#   success_rate        - env already logs a success signal
+#   progress_rate       - partial-completion signal
+# A task is "curriculum-ready" when it has a gate_metric AND a knob_subset.
+
+tasks:
+  Isaac-Velocity-Rough-Anymal-C-v0:
+    family: locomotion
+    workflow: manager_based
+    frameworks: [rsl_rl, rl_games, skrl]
+    play_task: Isaac-Velocity-Rough-Anymal-C-Play-v0
+    gate_metric:
+      kind: tracking_within_tol
+      name: tracking
+      tolerance: 0.25
+    native_curriculum: [terrain_levels]     # CurriculumTermCfg present in env cfg
+    knob_subset:
+      - command_range_lin_vel_x
+      - command_range_ang_vel_z
+      - reward_weight_action_rate
+      - reward_weight_dof_acc
+      - learning_rate
+      - entropy_coef
+      - desired_kl
+
+  Isaac-Velocity-Flat-Anymal-C-v0:
+    family: locomotion
+    workflow: manager_based
+    frameworks: [rsl_rl, rl_games, skrl]
+    play_task: Isaac-Velocity-Flat-Anymal-C-Play-v0
+    gate_metric:
+      kind: tracking_within_tol
+      name: tracking
+      tolerance: 0.25
+    native_curriculum: []
+    knob_subset:
+      - command_range_lin_vel_x
+      - command_range_ang_vel_z
+      - learning_rate
+      - entropy_coef
+      - desired_kl
+
+  # Cartpole: the Phase-0 smoke target (fast, cheap). Non-locomotion → gate
+  # falls back to mean reward in eval_rollout. No curriculum knobs declared.
+  Isaac-Cartpole-v0:
+    family: classic
+    workflow: manager_based
+    frameworks: [rl_games, skrl, sb3]
+    play_task: Isaac-Cartpole-v0
+    gate_metric:
+      kind: success_rate
+      name: gate
+    native_curriculum: []
+    knob_subset:
+      - learning_rate
+      - entropy_coef
