@@ -54,7 +54,7 @@ def make_policy(arm: str, args):
     policy; scripted needs a ladder DERIVED from a real manager journal
     (review B4) — passed via --scripted-from-journal."""
     sys.path.insert(0, _HERE)
-    from isaaclab_policies import (IsaacLabScriptedPolicy,
+    from isaaclab_policies import (IsaacLabScriptedPolicy, LLMPolicy,
                                    LocomotionManagerPolicy, ladder_from_journal)
     if arm == "manager":
         # t_low/t_high are calibrated to the task's ACHIEVABLE held-out ceiling
@@ -62,6 +62,10 @@ def make_policy(arm: str, args):
         # below 0.85), so expose them; defaults match the policy's 0.50/0.85.
         return LocomotionManagerPolicy(t_low=args.t_low, t_high=args.t_high,
                                        sustain=args.sustain)
+    if arm == "llm":
+        # the actual "LLM-guided" arm: shells out to `claude -p` with the
+        # playbook + digest. Same guardrails (registry validates its output).
+        return LLMPolicy(model=args.llm_model, t_low=args.t_low, t_high=args.t_high)
     if arm == "scripted":
         if not args.scripted_from_journal:
             raise SystemExit(
@@ -206,7 +210,9 @@ class MockLocomotionAdapter:
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Isaac Lab curriculum-RL driver")
-    p.add_argument("--arm", choices=["control", "manager", "scripted"], default="manager")
+    p.add_argument("--arm", choices=["control", "manager", "scripted", "llm"], default="manager")
+    p.add_argument("--llm-model", default=None,
+                   help="model for the --arm llm policy (passed to claude -p --model)")
     p.add_argument("--segments", type=int, default=3)
     p.add_argument("--iterations", type=int, default=50, help="train iters per segment")
     p.add_argument("--task", default="Isaac-Velocity-Rough-Anymal-C-v0")
@@ -248,7 +254,7 @@ def main(argv=None) -> int:
                 "(eval + experiment-name override are unimplemented); use "
                 "--framework skrl. See isaaclab-job-adapter/SKILL.md.")
 
-    if args.arm in ("manager", "scripted") and not args.heldout_manifest and not args.dry_run:
+    if args.arm in ("manager", "scripted", "llm") and not args.heldout_manifest and not args.dry_run:
         # BOTH the manager and its scripted competitor must use the identical
         # protected-metric gate, else the ON-vs-OFF comparison isn't apples-to-
         # apples (review B3 + fix-verify). The manager gates its decisions on

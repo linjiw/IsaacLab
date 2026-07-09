@@ -28,6 +28,10 @@ scripted replay of its own ladder to justify itself.
 from __future__ import annotations
 
 import dataclasses
+import json
+import os
+import re
+import subprocess
 from typing import Any, Dict, List, Optional, Tuple
 
 HELDOUT_KEY = "heldout_success_rate"
@@ -195,3 +199,84 @@ class IsaacLabScriptedPolicy:
             "expected_effect": "reproduces the manager's knob trajectory without closed-loop decisions",
             "tripwire": tw,
         }
+
+
+# ── LLM arm: the actual "LLM-guided" policy (shells out to claude -p) ─────
+PLAYBOOK_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "isaaclab-curriculum-manager", "SKILL.md")
+
+
+@dataclasses.dataclass
+class LLMPolicy:
+    """The LLM curriculum manager: shells out to `claude -p` with the
+    curriculum-manager playbook (SKILL.md) + the tick's digest, and parses one
+    schema-shaped decision. This is the "LLM-guided" arm the project goal names;
+    LocomotionManagerPolicy is its deterministic rule-based counterpart (the
+    validated core of the same playbook), and the two together let us ask
+    whether an LLM's judgment beats the fixed rule AND the scripted replay.
+
+    Fail-safe by design (SONIC LLMPolicy): any subprocess/parse failure degrades
+    to `action: none` with the reason recorded, so the loop never crashes on a
+    flaky/absent CLI and the journal shows exactly what happened.
+
+    Decisions still pass through KnobRegistry.validate_decision in the loop, so
+    a hallucinated knob / out-of-range value is rejected there — the LLM cannot
+    escape the whitelist or the bounded steps."""
+
+    model: Optional[str] = None
+    timeout_s: int = 180
+    t_low: float = 0.50            # passed to the prompt so the LLM knows the band
+    t_high: float = 0.85
+
+    def __post_init__(self):
+        try:
+            with open(PLAYBOOK_PATH) as f:
+                self._playbook = f.read()
+        except OSError:
+            self._playbook = "(playbook unavailable)"
+
+    def _prompt(self, digest: Dict[str, Any]) -> str:
+        return (
+            "You are the Isaac Lab curriculum manager. Follow this playbook "
+            "EXACTLY — its hard rules, tick procedure, and decision table. You "
+            f"gate on the PROTECTED held-out metric; band t_low={self.t_low}, "
+            f"t_high={self.t_high}.\n\n<playbook>\n" + self._playbook +
+            "\n</playbook>\n\nCurrent digest (this tick's only observation):\n\n"
+            "```json\n" + json.dumps(digest, indent=1, default=str) + "\n```\n\n"
+            "Reply with ONLY one fenced ```json block containing the decision "
+            'object: {"action":"none","reason":...} OR {"action":"set",'
+            '"knob":...,"value":...,"rationale":...,"expected_effect":...,'
+            '"tripwire":{"metric":...,"drop_pct":...,"evals":...}}. '
+            "The knob MUST be one from the playbook's registry; steps are "
+            "bounded by the registry (the harness will reject violations). "
+            "No text outside the fenced block."
+        )
+
+    def propose(self, digest: Dict[str, Any], state, registry) -> Dict[str, Any]:
+        cmd = ["claude", "-p", "--output-format", "text"]
+        if self.model:
+            cmd += ["--model", self.model]
+        try:
+            proc = subprocess.run(cmd, input=self._prompt(digest),
+                                  capture_output=True, text=True,
+                                  timeout=self.timeout_s)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            return {"action": "none", "reason": f"llm unavailable: {e}"}
+        if proc.returncode != 0:
+            return {"action": "none",
+                    "reason": f"llm error (rc={proc.returncode}): {proc.stderr[:200]}"}
+        return self._parse(proc.stdout)
+
+    @staticmethod
+    def _parse(text: str) -> Dict[str, Any]:
+        m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        raw = m.group(1) if m else text.strip()
+        try:
+            decision = json.loads(raw)
+        except json.JSONDecodeError:
+            return {"action": "none",
+                    "reason": f"unparseable llm output: {text[:200]!r}"}
+        if not isinstance(decision, dict) or "action" not in decision:
+            return {"action": "none", "reason": "llm output missing 'action'"}
+        return decision

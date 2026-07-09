@@ -55,6 +55,7 @@ class _Args:
         self.t_high = 0.85
         self.sustain = 3
         self.base_knob = []
+        self.llm_model = None
         for k, v in kw.items():
             setattr(self, k, v)
 
@@ -172,3 +173,45 @@ def test_ladder_from_journal_extracts_only_applied_sets():
     ]
     ladder = ladder_from_journal(journal)
     assert ladder == {2: ("command_range_lin_vel_x", 1.25)}
+
+
+# ── LLM arm: parse + fail-safe (CPU, no claude CLI needed) ────────────
+def test_llm_policy_parses_fenced_json():
+    from isaaclab_policies import LLMPolicy
+    d = LLMPolicy._parse('here\n```json\n{"action": "none", "reason": "healthy"}\n```\nbye')
+    assert d["action"] == "none" and d["reason"] == "healthy"
+
+
+def test_llm_policy_parses_bare_json():
+    from isaaclab_policies import LLMPolicy
+    d = LLMPolicy._parse('{"action":"set","knob":"learning_rate","value":8e-4}')
+    assert d["action"] == "set" and d["knob"] == "learning_rate"
+
+
+def test_llm_policy_failsafe_on_garbage():
+    from isaaclab_policies import LLMPolicy
+    d = LLMPolicy._parse("the model rambled without any json")
+    assert d["action"] == "none" and "unparseable" in d["reason"]
+
+
+def test_llm_policy_failsafe_on_missing_action():
+    from isaaclab_policies import LLMPolicy
+    d = LLMPolicy._parse('```json\n{"knob": "x"}\n```')
+    assert d["action"] == "none" and "action" in d["reason"]
+
+
+def test_llm_policy_unavailable_cli_is_none():
+    # a bogus model + missing CLI must degrade to none, never raise
+    from isaaclab_policies import LLMPolicy
+    pol = LLMPolicy(model="nonexistent", timeout_s=1)
+    # monkeypatch the command to a guaranteed-missing binary via PATH is
+    # overkill; instead call propose and accept either 'llm unavailable' or an
+    # error reason — the contract is: returns a dict with action == 'none'.
+    import subprocess
+    orig = subprocess.run
+    subprocess.run = lambda *a, **k: (_ for _ in ()).throw(OSError("no claude"))
+    try:
+        d = pol.propose({"eval": {}}, None, None)
+    finally:
+        subprocess.run = orig
+    assert d["action"] == "none" and "unavailable" in d["reason"]
