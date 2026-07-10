@@ -93,6 +93,22 @@ def check(pilot_dir: str) -> int:
     gate(True, "scripted replays manager ladder", faithful,
          f"manager={len(m_ladder)} rungs, scripted={len(s_moves)} moves")
 
+    # SAME-SEED DEGENERACY CHECK (EVAL_FRAMEWORK §0a): if scripted replays the
+    # SAME seed's manager, bit-deterministic training makes their held-out
+    # identical -> manager-vs-scripted is a tautology, NOT an adaptivity result.
+    # This is a SOFT gate: it does not fail the run (the pilot is valid as
+    # machinery validation), but it LOUDLY flags that the mgr-vs-scr delta here
+    # is meaningless and a cross-seed run (run_experiment.sh) is required.
+    m_ho = [(e.get("heldout") or {}).get("heldout_success_rate")
+            for e in _segments(J["manager"])]
+    s_ho = [(e.get("heldout") or {}).get("heldout_success_rate")
+            for e in _segments(J["scripted"])]
+    bit_identical = (m_ho == s_ho and any(x is not None for x in m_ho))
+    gate(False, "mgr!=scr (cross-seed?)", not bit_identical,
+         "DEGENERATE: manager==scripted (same-seed, bit-identical) -> mgr-vs-scr "
+         "is a tautology; use run_experiment.sh (cross-seed) for a verdict"
+         if bit_identical else "arms differ (cross-seed or divergent ladder)")
+
     # control applied nothing
     gate(True, "control applied nothing", not _applied(J["control"]))
 
