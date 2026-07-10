@@ -218,11 +218,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     mk = sub.add_parser("make-manifest", help="build a command grid + split")
     # in-envelope defaults (achievable within tol) so the metric discriminates
     # policy quality; see command_grid docstring (verified in-container).
+    # LEVER-METRIC ALIGNMENT (GAPS A0): if the experiment's lever is
+    # command_range widening, use a GRADUATED WIDE grid instead so widening is
+    # rewarded, e.g. --lin-vel-x="-2,-1,-0.5,0.5,1,2" --ang-vel-z="-2,-1,1,2"
+    # (spans what the manager can reach; keep <= ~2 — |vx|=3 is unachievable and
+    # floors the metric at 0). For an OPTIMIZER-lever experiment keep it narrow.
     mk.add_argument("--lin-vel-x", default="-1,-0.5,0.5,1",
-                    help="comma list of lin_vel_x samples (keep within the "
-                         "achievable tracking envelope, e.g. |vx|<=1)")
+                    help="comma list of lin_vel_x samples. Narrow (|vx|<=1) for "
+                         "optimizer levers; graduated wide (up to ~2) to ALIGN "
+                         "with a command-range-widening lever (GAPS A0).")
     mk.add_argument("--ang-vel-z", default="-1,-0.5,0.5,1",
-                    help="comma list of ang_vel_z samples (|wz|<=1)")
+                    help="comma list of ang_vel_z samples (match the lever; "
+                         "narrow for optimizer, up to ~2 for range widening)")
     mk.add_argument("--lin-vel-y", default="0")
     mk.add_argument("--fraction", type=float, default=0.34)
     mk.add_argument("--salt", required=True)

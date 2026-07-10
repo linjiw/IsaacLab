@@ -31,6 +31,20 @@ beyond one task/framework · **[POLISH]** quality/robustness.
   curriculum knobs don't move the protected metric beyond training-duration" — a valid negative
   result, reported as such. This is the top question for the third review.
 
+- **[BLOCK] LEVER–METRIC ALIGNMENT (the root fix, from the v2 control arm).** Real data:
+  control (range fixed at 1.0) scored held-out 0.397 at s3 vs manager (widened to 1.25) 0.389 —
+  i.e. **widening the training command range made the FIXED in-envelope held-out slightly WORSE**
+  (−0.008, 1 seed, within noise but the SIGN is mechanistically sensible: widening spends policy
+  capacity on fast commands the narrow held-out never tests → negative transfer). The lever and
+  metric are **misaligned**: we widen TRAINING but evaluate on a NARROW fixed grid, so widening
+  can only hurt. **Principled fix for the next experiment:** make the held-out grid span the
+  command envelope the manager can REACH (e.g. graduated up to |vx|≈2, keeping headroom — ±3 is
+  physically unachievable and floors the metric at 0). Then "widen training" is *rewarded* by
+  better generalization to a wider held-out set, and the curriculum question becomes answerable:
+  "does adaptively deciding WHEN to widen beat a fixed widening schedule, measured on a held-out
+  set that DEMANDS the wider competence?" This is the preferred resolution over (b)/(c) above
+  because it aligns the curriculum's ACTION with the metric's DEMAND rather than switching levers.
+
 ## A. Evaluation & scientific validity
 
 - **[BLOCK] No measured Isaac Lab noise band.** The equivalence gate uses SONIC's τ
