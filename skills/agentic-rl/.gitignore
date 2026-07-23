@@ -15,3 +15,6 @@ __pycache__/
 # test suite IS source (its provenance/regression guarantee) — un-ignore it.
 !runmanager/tests/
 !runmanager/tests/**
+
+# ...but bytecode caches under tests are still caches
+runmanager/tests/**/__pycache__/

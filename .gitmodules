@@ -1,0 +1,4 @@
+[submodule "scripts/curriculum-maxrl"]
+	branch = isaaclab-integration
+	path = scripts/curriculum-maxrl
+	url = https://github.com/linjiw/curriculum-maxrl.git
